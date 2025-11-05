@@ -2,20 +2,20 @@
 
 ## Tampilan endpoint Read book
 
-![GET](image.png)
+![GET](gambarrandom/image.png)
 
 ## Tampilan Endpoint Create Book
 
-![POST](image-1.png)
+![POST](gambarrandom/image-1.png)
 
 ## tampilan Update Book
 
-![PUT](image-2.png)
+![PUT](gambarrandom/image-2.png)
 
 ## Tampilan Delete
 
-![DELETE](image-3.png)
+![DELETE](gambarrandom/image-3.png)
 
 ## Tampilan Read By ID Book
 
-![GET BY ID](image-4.png)
+![GET BY ID](gambarrandom/image-4.png)
