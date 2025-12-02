@@ -1,38 +1,30 @@
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
 const presensiController = require('../controllers/presensiController');
-const { addUserData } = require('../middleware/permissionMiddleware');
-router.use(addUserData);
+// Perbaikan: Import verifyToken
+const { verifyToken } = require('../middleware/permissionMiddleware'); 
+const { body } = require("express-validator");
+
+// Perbaikan: Gunakan verifyToken
+router.use(verifyToken);
+
 router.post('/check-in', presensiController.CheckIn);
 router.post('/check-out', presensiController.CheckOut);
-module.exports = router;
-router.delete("/:id", presensiController.deletePresensi);
-router.put(
-  '/:id',
-  [
-    // Validasi checkIn jika dikirim
-    body('checkIn')
-      .optional() // hanya validasi kalau field dikirim
-      .isISO8601()
-      .withMessage('checkIn harus dalam format tanggal yang valid (ISO 8601)'),
 
-    // Validasi checkOut jika dikirim
-    body('checkOut')
+router.delete('/:id', presensiController.deletePresensi);
+router.put(
+  "/:id",
+  [
+    body("checkIn")
+      .optional() // validasi hanya jika dikirim
+      .isISO8601()
+      .withMessage("checkIn harus berupa format tanggal yang valid (ISO 8601)"),
+    body("checkOut")
       .optional()
       .isISO8601()
-      .withMessage('checkOut harus dalam format tanggal yang valid (ISO 8601)'),
+      .withMessage("checkOut harus berupa format tanggal yang valid (ISO 8601)"),
   ],
-  (req, res, next) => {
-    // Tangani hasil validasi
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        message: 'Validasi gagal',
-        errors: errors.array(),
-      });
-    }
-    next(); // lanjut ke controller updatePresensi
-  },
   presensiController.updatePresensi
 );
+
+module.exports = router;

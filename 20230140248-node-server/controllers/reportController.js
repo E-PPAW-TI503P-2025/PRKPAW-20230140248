@@ -1,64 +1,54 @@
-const presensiRecords = require("../data/presensiData");
-const { Presensi } = require("../models");
+const { Presensi, User } = require("../models"); // <-- Import User
 const { Op } = require("sequelize");
 
 exports.getDailyReport = async (req, res) => {
   try {
     const { nama, tanggalMulai, tanggalSelesai } = req.query;
-    let options = { where: {} };
+    const options = { 
+        where: {},
+        // Tambahkan JOIN (include) ke tabel User
+        include: [{ 
+            model: User, 
+            as: 'user', 
+            attributes: ['nama'] // Hanya ambil kolom nama dari User
+        }]
+    };
 
-    // 🔍 Filter berdasarkan nama (opsional)
     if (nama) {
-      options.where.nama = {
-        [Op.like]: `%${nama}%`,
+        // Filter nama melalui kondisi di model User yang direlasikan
+        options.include[0].where = { 
+            nama: { [Op.like]: `%${nama}%` }
+        };
+    }
+
+    if (tanggalMulai && tanggalSelesai) {
+      options.where.checkIn = {
+        [Op.between]: [tanggalMulai, tanggalSelesai],
       };
     }
-
-    // 📅 Filter berdasarkan rentang tanggal checkIn & checkOut
-    if (tanggalMulai && tanggalSelesai) {
-      const startDate = new Date(tanggalMulai);
-      const endDate = new Date(tanggalSelesai);
-
-      // Validasi tanggal
-      if (!isNaN(startDate) && !isNaN(endDate)) {
-        // Sertakan seluruh hari terakhir (hingga 23:59:59)
-        endDate.setHours(23, 59, 59, 999);
-
-        // Filter data yang memiliki checkIn / checkOut dalam rentang tanggal
-        options.where = {
-          ...options.where,
-          [Op.or]: [
-            {
-              checkIn: {
-                [Op.between]: [startDate, endDate],
-              },
-            },
-            {
-              checkOut: {
-                [Op.between]: [startDate, endDate],
-              },
-            },
-          ],
-        };
-      }
-    }
-
-    // 🔄 Ambil data dari database
+    
+    // Fetch data with relations
     const records = await Presensi.findAll(options);
+    
+    // Map the result to include the user's name directly in the report structure
+    const formattedRecords = records.map(record => ({
+        id: record.id,
+        userId: record.userId,
+        nama: record.user.nama, // <-- Ambil nama dari relasi User
+        checkIn: record.checkIn,
+        checkOut: record.checkOut,
+        latitude: record.latitude, 
+        longitude: record.longitude, 
+    }));
 
-    // 📦 Kembalikan hasil response
     res.json({
       reportDate: new Date().toLocaleDateString(),
       filter: { nama, tanggalMulai, tanggalSelesai },
-      totalRecords: records.length,
-      data: records,
+      data: formattedRecords, // Gunakan data yang telah diformat
     });
   } catch (error) {
-    res.status(500).json({
-      message: "Gagal mengambil laporan harian",
-      error: error.message,
-    });
+    res
+      .status(500)
+      .json({ message: "Gagal mengambil laporan", error: error.message });
   }
 };
-
-
