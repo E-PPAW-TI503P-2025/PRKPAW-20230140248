@@ -8,8 +8,7 @@ const { body } = require("express-validator");
 // Perbaikan: Gunakan verifyToken
 router.use(verifyToken);
 
-router.post('/check-in', presensiController.CheckIn);
-router.post('/check-out', presensiController.CheckOut);
+router.post('/check-in', [verifyToken, presensiController.upload.single('image')], presensiController.CheckIn);
 
 router.delete('/:id', presensiController.deletePresensi);
 router.put(
@@ -26,5 +25,7 @@ router.put(
   ],
   presensiController.updatePresensi
 );
+
+
 
 module.exports = router;

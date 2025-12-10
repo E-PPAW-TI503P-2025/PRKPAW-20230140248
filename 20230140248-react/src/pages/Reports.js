@@ -108,6 +108,7 @@ function ReportPage() {
                           })
                         : "Belum Check-Out"}
                     </td>
+                    
                   </tr>
                 ))
               ) : (

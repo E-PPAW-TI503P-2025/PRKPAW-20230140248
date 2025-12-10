@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import Webcam from 'react-webcam';
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 // ADDED Leaflet imports
@@ -21,6 +22,17 @@ function AttendancePage() {
   const [error, setError] = useState("");
   const [coords, setCoords] = useState(null); // {lat, lng} - Logika mapKey dihapus
   const navigate = useNavigate();
+  const [image, setImage] = useState(null); 
+ 	const webcamRef = useRef(null);
+  const getToken = () => localStorage.getItem("token"); 
+ 	const capture = useCallback(() => {
+ 	const imageSrc = webcamRef.current.getScreenshot();
+ 	    setImage(imageSrc); 
+ 	  }, [webcamRef]);
+
+    
+
+
   // Dihapus: const [mapKey, setMapKey] = useState(0);
 
   // Fungsi untuk mendapatkan header otentikasi JWT
@@ -74,18 +86,30 @@ function AttendancePage() {
     const config = getAuthHeaders();
     if (!config) return;
 
-    if (!coords) {
-      setError("Lokasi belum didapatkan. Mohon izinkan akses lokasi.");
-      return;
-    }
+    if (!coords || !image) {
+ 	      setError("Lokasi dan Foto wajib ada!");
+ 	      return;
+ 	    }
+
 
     try {
-      // Mengirim koordinat di body request
-      const response = await axios.post('http://localhost:3001/api/presensi/check-in', {
-        latitude: coords.lat, 
-        longitude: coords.lng
-      }, config);
-      setMessage(response.data.message); 
+ 	      
+ 	      const blob = await (await fetch(image)).blob();
+ 	      
+ 	      //Buat FormData
+ 	      const formData = new FormData();
+ 	      formData.append('latitude', coords.lat);
+ 	      formData.append('longitude', coords.lng);
+ 	      formData.append('image', blob, 'selfie.jpg'); 
+ 	
+ 	      const response = await axios.post(
+ 	        'http://localhost:3001/api/presensi/check-in',
+ 	        formData, 
+ 	        { headers: { Authorization: `Bearer ${getToken()}` } }
+ 	      );
+ 	      
+ 	      setMessage(response.data.message);
+ 
     } catch (err) {
       setError(err.response?.data?.message || "Check-In gagal");
     }
@@ -106,67 +130,102 @@ function AttendancePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-lg text-center">
-        <h2 className="text-3xl font-bold mb-6 text-gray-800">
-          Lakukan Presensi
-        </h2>
+  <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+    <div className="bg-white p-8 rounded-lg shadow-md w-full max-w-lg text-center">
+      <h2 className="text-3xl font-bold mb-6 text-gray-800">
+        Lakukan Presensi
+      </h2>
 
-        {/* Visualisasi Peta menggunakan React Leaflet */}
-        {coords ? (
-            <div className="my-4 border rounded-lg overflow-hidden">
-                {/* Dihapus: key={mapKey} */}
-                <MapContainer 
-                    center={[coords.lat, coords.lng]} 
-                    zoom={15} 
-                    style={{ height: '300px', width: '100%' }}
-                >
-                    <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-                    />
-                    <Marker position={[coords.lat, coords.lng]}>
-                        <Popup>Lokasi Presensi Anda</Popup>
-                    </Marker>
-                </MapContainer>
-            </div>
+      {/* Visualisasi Peta */}
+      {coords ? (
+        <div className="my-4 border rounded-lg overflow-hidden">
+          <MapContainer
+            center={[coords.lat, coords.lng]}
+            zoom={15}
+            style={{ height: "300px", width: "100%" }}
+          >
+            <TileLayer
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              attribution='&copy; OpenStreetMap contributors'
+            />
+            <Marker position={[coords.lat, coords.lng]}>
+              <Popup>Lokasi Presensi Anda</Popup>
+            </Marker>
+          </MapContainer>
+        </div>
+      ) : (
+        <div className="my-4 p-4 text-center text-gray-600 border rounded-lg bg-yellow-50">
+          Memuat lokasi... (Pastikan izin lokasi diberikan)
+        </div>
+      )}
+
+      {/* --- PLACE THE CAMERA HERE --- */}
+      <div className="my-4 border rounded-lg overflow-hidden bg-black">
+        {image ? (
+          <img src={image} alt="Selfie" className="w-full" />
         ) : (
-            <div className="my-4 p-4 text-center text-gray-600 border rounded-lg bg-yellow-50">
-                Memuat lokasi... (Pastikan izin lokasi diberikan)
-            </div>
+          <Webcam
+            audio={false}
+            ref={webcamRef}
+            screenshotFormat="image/jpeg"
+            className="w-full"
+          />
         )}
+      </div>
 
-        {message && <p className="text-green-600 mb-4">{message}</p>}
-        {error && <p className="text-red-600 mb-4">{error}</p>}
-
-        <div className="flex space-x-4">
+      {/* Tombol Capture / Ulang */}
+      <div className="mb-4">
+        {!image ? (
           <button
-            onClick={handleCheckIn}
-            className="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700 disabled:opacity-50"
-            disabled={!coords} // Disable jika koordinat belum tersedia
+            onClick={capture}
+            className="bg-blue-500 text-white px-4 py-2 rounded w-full"
           >
-            Check-In
+            Ambil Foto 📸
           </button>
-
+        ) : (
           <button
-            onClick={handleCheckOut}
-            className="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-md shadow-sm hover:bg-red-700"
+            onClick={() => setImage(null)}
+            className="bg-gray-500 text-white px-4 py-2 rounded w-full"
           >
-            Check-Out
+            Foto Ulang 🔄
           </button>
-        </div>
-        
-        <div className="mt-4">
-            <button
-                onClick={() => navigate('/dashboard')}
-                className="w-full py-2 px-4 bg-gray-300 text-gray-800 font-semibold rounded-md shadow-sm hover:bg-gray-400"
-            >
-                Kembali ke Dashboard
-            </button>
-        </div>
+        )}
+      </div>
+      {/* --- END CAMERA SECTION --- */}
+
+      {message && <p className="text-green-600 mb-4">{message}</p>}
+      {error && <p className="text-red-600 mb-4">{error}</p>}
+
+      {/* Tombol Check-In & Check-Out */}
+      <div className="flex space-x-4">
+        <button
+          onClick={handleCheckIn}
+          className="w-full py-3 px-4 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700 disabled:opacity-50"
+          disabled={!coords || !image} // WAJIB FOTO DULU
+        >
+          Check-In
+        </button>
+
+        <button
+          onClick={handleCheckOut}
+          className="w-full py-3 px-4 bg-red-600 text-white font-semibold rounded-md shadow-sm hover:bg-red-700"
+        >
+          Check-Out
+        </button>
+      </div>
+
+      <div className="mt-4">
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="w-full py-2 px-4 bg-gray-300 text-gray-800 font-semibold rounded-md shadow-sm hover:bg-gray-400"
+        >
+          Kembali ke Dashboard
+        </button>
       </div>
     </div>
-  );
+  </div>
+);
+
 }
 
 export default AttendancePage;
